@@ -75,7 +75,7 @@ _start:
     mov eax, 4
     int 0x80
 
-    jmp _game
+    jmp _game_1
 
 _show_statistique:
     ;Afficher '========= Statistique ========='
@@ -291,7 +291,7 @@ _show_statistique:
     jmp _player_choice
 
 
-_game:
+_game_1:
     ;Afficher 'Name + vous arivez dans la Caverne des Goblin.'
     mov edx, [len_player_name]
     mov ecx, player + Player.name
@@ -306,10 +306,34 @@ _game:
     int 0x80
 
     ;Premier combat
-    call _print_monster_attack
+    jmp _print_goblin_attack
+
+_game_2:
+    ;Afficher 2 retour a la ligne 
+    mov edx, 2
+    mov ecx, double_newline
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Afficher 'Name + vous arivez dans la crypte des squelettes.
+    mov edx, [len_player_name]
+    mov ecx, player + Player.name
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov edx, len_print_salles_2
+    mov ecx, print_salles_2
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Deuxieme combat
+    jmp _print_sqelette_attack
 
 
-_print_monster_attack:
+_print_goblin_attack:
     ;Affiche 'Un '
     mov edx, len_un
     mov ecx, un
@@ -320,6 +344,30 @@ _print_monster_attack:
     ;Affiche le nom du monstre
     mov edx, len_goblin_name
     mov ecx, goblin_name
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Affiche ' vous attaque'
+    mov edx, len_attack_message
+    mov ecx, attack_message
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    jmp _player_choice
+
+_print_sqelette_attack:
+    ;Affiche 'Un '
+    mov edx, len_un
+    mov ecx, un
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Affiche le nom du monstre
+    mov edx, len_squelette_name
+    mov ecx, squelette_name
     mov ebx, 1
     mov eax, 4
     int 0x80
@@ -347,7 +395,7 @@ _player_choice:
     int 0x80
 
     cmp byte [what_player_choice], '1'
-    je _attack_function
+    je _verify_attack
     cmp byte [what_player_choice], '2'
     je _show_statistique
     cmp byte [what_player_choice], '3'
@@ -357,7 +405,13 @@ _player_choice:
 
     jmp _player_choice
 
-_attack_function:
+_verify_attack:
+    cmp byte [nb_salles], 1
+    je _attack_goblin_function
+    cmp byte [nb_salles], 2
+    je _attack_squelette_function
+
+_attack_goblin_function:
     ;Enlever les pv du monstre
     mov eax, [player + Player.attack]
     sub [goblin + Monster.pv], eax
@@ -396,13 +450,59 @@ _attack_function:
     int 0x80
 
     cmp dword [goblin + Monster.pv], 0
-    jle _monster_defeated
+    jle _goblin_defeated
     cmp dword [goblin + Monster.pv], 0
+    jg _show_pv
+
+_attack_squelette_function:
+    mov eax, [player + Player.attack]
+    sub [squelette + Monster.pv], eax
+
+    ;Afficher 'Vous avez infliger '
+    mov edx, len_player_attack
+    mov ecx, player_attack
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov eax, [player + Player.attack]
+
+    xor edx, edx
+    mov ebx, 10
+    div ebx
+
+    add al, '0'
+    add dl, '0'
+
+    mov [attack_buffer], al
+    mov [attack_buffer + 1], dl
+
+    ;Afficher le nombre de degat que le joueur a infliger
+    mov edx, 2
+    mov ecx, attack_buffer
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Affiche ' dégat'
+    mov edx, len_degat
+    mov ecx, degat
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    cmp dword [squelette + Monster.pv], 0
+    jle _squelette_defeated
+    cmp dword [squelette + Monster.pv], 0
     jg _show_pv
 
 _show_pv:
     ;Enlever les point de vie du joueur
-    mov eax, [goblin + Monster.attack]
+    cmp dword [nb_salles], 1
+    cmove eax, [goblin + Monster.attack]
+    cmp dword [nb_salles], 2
+    cmove eax, [squelette + Monster.attack]
+
     sub [player + Player.pv], eax
 
     ;Afficher le nombre de pv que le joueurs as 'Vous avez 100/100 Pv'
@@ -482,7 +582,10 @@ _show_pv:
     mov eax, 4
     int 0x80
 
-    jmp _show_goblin_pv
+    cmp dword [nb_salles], 1
+    je _show_goblin_pv
+    cmp dword [nb_salles], 2
+    je _show_squelette_pv
 
 
 _show_goblin_pv:
@@ -557,7 +660,79 @@ _show_goblin_pv:
 
     jmp _player_choice
 
-_monster_defeated:
+_show_squelette_pv:
+    ;Afficher le nombre de Pv du squelette
+    mov edx, len_le
+    mov ecx, le
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Afficher le nom du monstre
+    mov edx, len_squelette_name
+    mov ecx, squelette_name
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov edx, len_a
+    mov ecx, a
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov eax, [squelette + Monster.pv]
+
+    xor edx, edx
+    mov ebx, 10
+    div ebx
+
+    add al, '0'
+    add dl, '0'
+
+    mov [pv_buffer], al
+    mov [pv_buffer + 1], dl
+
+    mov edx, 2
+    mov ecx, pv_buffer
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    ;Afficher le '/'
+    mov edx, len_print_slash
+    mov ecx, print_slash
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov eax, [squelette + Monster.pv_max]
+
+    xor edx, edx
+    mov ebx, 10
+    div ebx
+
+    add al, '0'
+    add dl, '0'
+
+    mov [pv_buffer], al
+    mov [pv_buffer + 1], dl
+
+    mov edx, 2
+    mov ecx, pv_buffer
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov edx, len_pv
+    mov ecx, pv
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    jmp _player_choice
+
+_goblin_defeated:
     ;Afficher que le monstre est mort
     mov edx, len_monster_die
     mov ecx, monster_die
@@ -571,7 +746,32 @@ _monster_defeated:
     mov eax, 4
     int 0x80
 
+    inc dword [nb_salles]
+
+    cmp dword [nb_salles], 2
+    je _game_2
+
+
     jmp _end
+
+_squelette_defeated:
+    ;Afficher que le monstre est mort
+    mov edx, len_monster_die
+    mov ecx, monster_die
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    mov edx, len_squelette_name
+    mov ecx, squelette_name
+    mov ebx, 1
+    mov eax, 4
+    int 0x80
+
+    inc dword [nb_salles]
+
+    cmp dword [nb_salles], 3
+    je _game_2
 
 _show_potion:
     ;Afficher '========= Potions ========='
@@ -814,6 +1014,19 @@ goblin:
         at Monster.attack, dd 5
     iend
 
+squelette:
+    istruc Monster
+        at Monster.name, db "Squelette"
+        at Monster.pv, dd 50
+        at Monster.pv_max, dd 50
+        at Monster.xp_min, dd 70
+        at Monster.xp_max, dd 100
+        at Monster.attack, dd 8
+    iend
+
+    ;Dire ou est le joueur
+    nb_salles dd 1
+
 
     ask_name db 'Bonjour, quelle est vottre nom ? '
     len_ask_name equ $ - ask_name
@@ -824,11 +1037,17 @@ goblin:
     print_salles_1 db ' vous arivez dans la Caverne des Goblin.', 0xa
     len_print_salles_1 equ $ - print_salles_1
 
+    print_salles_2 db ' vous arivez dans la Crypte des Squelettes', 0xa
+    len_print_salles_2 equ $ - print_salles_2
+
     un db 'Un '
     len_un equ $ - un
 
     goblin_name db 'Goblin'
     len_goblin_name equ $ - goblin_name
+
+    squelette_name db 'Squelette '
+    len_squelette_name equ $ - squelette_name
 
     attack_message db ' vous attaque', 0xa
     len_attack_message equ $ - attack_message
@@ -889,6 +1108,7 @@ goblin:
     len_print_player_pv equ $ - print_player_pv
 
     newline db 0xa
+    double_newline db 0xa, 0xa
 
     show_potions db 0xa, 0xa, '========= Potions =========', 0xa
     len_show_potions equ $ - show_potions
